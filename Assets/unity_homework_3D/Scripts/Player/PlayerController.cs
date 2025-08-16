@@ -1,7 +1,6 @@
 using Constants;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using Weapons;
 using InputSystem = Core.InputSystem;
 
 namespace Player
@@ -31,8 +30,8 @@ namespace Player
         public ParticleSystem sprintWindEffect;
         public float landingVelocityThreshold = -5f;
 
-        [Header("Weapon")] 
-        public Weapon playerWeapon;
+        [Header("Weapon System")] 
+        public WeaponOwner weaponOwner;
 
         private CharacterController _controller;
         private Vector3 _velocity;
@@ -55,6 +54,10 @@ namespace Player
             _inputActions = new InputSystem();
             _controller = GetComponent<CharacterController>();
 
+            // Get weapon owner if not assigned
+            if (!weaponOwner)
+                weaponOwner = GetComponent<WeaponOwner>();
+
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }
@@ -70,8 +73,10 @@ namespace Player
             _inputActions.Player.Jump.canceled += OnJump;
             _inputActions.Player.Sprint.performed += OnSprint;
             _inputActions.Player.Sprint.canceled += OnSprint;
-            _inputActions.Player.Attack.performed += OnAttack;
+            _inputActions.Player.Attack.started += OnAttackStarted;
+            _inputActions.Player.Attack.canceled += OnAttackCanceled;
             _inputActions.Player.Reload.performed += OnReload;
+            _inputActions.Player.Interact.performed += OnInteract;
         }
 
         private void OnDisable()
@@ -85,8 +90,10 @@ namespace Player
             _inputActions.Player.Jump.canceled -= OnJump;
             _inputActions.Player.Sprint.performed -= OnSprint;
             _inputActions.Player.Sprint.canceled -= OnSprint;
-            _inputActions.Player.Attack.performed -= OnAttack;
+            _inputActions.Player.Attack.started -= OnAttackStarted;
+            _inputActions.Player.Attack.canceled -= OnAttackCanceled;
             _inputActions.Player.Reload.performed -= OnReload;
+            _inputActions.Player.Interact.performed -= OnInteract;
         }
 
         private void Update()
@@ -201,19 +208,43 @@ namespace Player
         
         private void OnSprint(InputAction.CallbackContext context) => _sprintInput = context.ReadValueAsButton();
         
-        private void OnAttack(InputAction.CallbackContext context)
+        private void OnAttackStarted(InputAction.CallbackContext context)
         {
-            if ((context.started || context.performed) && playerWeapon?.CanFire() == true)
+            if (!weaponOwner || !weaponOwner.HasWeapon) return;
+            
+            if (weaponOwner.CanFire())
             {
-                playerWeapon.Fire();
+                weaponOwner.Fire();
+            }
+            
+            if (weaponOwner.CurrentWeapon?.IsFullAuto == true)
+            {
+                weaponOwner.StartFiring();
+            }
+        }
+        
+        private void OnAttackCanceled(InputAction.CallbackContext context)
+        {
+            if (weaponOwner && weaponOwner.HasWeapon)
+            {
+                weaponOwner.StopFiring();
             }
         }
         
         private void OnReload(InputAction.CallbackContext context)
         {
-            if (context.performed && playerWeapon && !playerWeapon.IsReloading)
+            if (context.performed && weaponOwner && weaponOwner.HasWeapon)
             {
-                playerWeapon.StartReload();
+                weaponOwner.Reload();
+            }
+        }
+        
+        private void OnInteract(InputAction.CallbackContext context)
+        {
+            // Handle both started and performed for Hold interaction
+            if (context.started || context.performed)
+            {
+                weaponOwner?.TryPickupWeapon();
             }
         }
     }

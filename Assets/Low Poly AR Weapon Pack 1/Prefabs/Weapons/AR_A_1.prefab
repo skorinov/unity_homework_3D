@@ -611,6 +611,10 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3557320247793090291}
+  - component: {fileID: 2564840005600767246}
+  - component: {fileID: 8734449582148588350}
+  - component: {fileID: 5683298396739782159}
+  - component: {fileID: 341177193713071635}
   m_Layer: 7
   m_Name: AR_A_1
   m_TagString: Untagged
@@ -644,6 +648,109 @@ Transform:
   - {fileID: 244453420088117072}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &2564840005600767246
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4185518912306324553}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.11947727, y: 0.44811678, z: 1.2165174}
+  m_Center: {x: -0.000013589859, y: 0.0018527508, z: 0.1709485}
+--- !u!54 &8734449582148588350
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4185518912306324553}
+  serializedVersion: 4
+  m_Mass: 1
+  m_Drag: 0
+  m_AngularDrag: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
+--- !u!114 &5683298396739782159
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4185518912306324553}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f9af8a2ee48b475898f1f8b9be379ca8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &341177193713071635
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4185518912306324553}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c43abbc2c8d743cea4b6da818b489eb7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  weaponData:
+    weaponName: "\u041C4"
+    damage: 25
+    fireRate: 600
+    range: 100
+    maxAmmo: 30
+    reloadTime: 2
+    bulletSpeed: 50
+    spread: 0.02
+    isFullAuto: 0
+    isShotgun: 0
+    pelletCount: 8
+    pelletSpread: 0.15
+  bulletData:
+    lifetime: 5
+    maxBounces: 2
+    bounceForce: 0.5
+    hitLayers:
+      serializedVersion: 2
+      m_Bits: 4294967295
+  effectData:
+    muzzleFlashPrefab: {fileID: 100006, guid: 30b4cc2728d8cec499fad63ba93785a4, type: 3}
+    impactEffectPrefab: {fileID: 100002, guid: 99c73c92ac40473459640b165473206f, type: 3}
+    decalPrefab: {fileID: 8818368308428250104, guid: c47b8b014a4a68a47b87fe78bb7d179e, type: 3}
+    bulletTrailPrefab: {fileID: 6448310529509437964, guid: 7f65b8473baaa1d4a85c7a75d03c897f, type: 3}
+    decalLifetime: 10
+    fireSound: {fileID: 0}
+    reloadSound: {fileID: 0}
+  firePoint: {fileID: 0}
+  bulletPrefab: {fileID: 8489818951931819000, guid: 76d6965a82c700547ac9c860a6e92ca9, type: 3}
+  audioSource: {fileID: 0}
 --- !u!1 &4638949467097366829
 GameObject:
   m_ObjectHideFlags: 0

@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 9200815599039783417}
   - component: {fileID: 4228087289668388825}
   - component: {fileID: 6501745303647254983}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: AR_E_Barrel
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -97,7 +97,7 @@ GameObject:
   - component: {fileID: 472773029134559143}
   - component: {fileID: 8269385538331487026}
   - component: {fileID: 1183725598801523997}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: AR_E_Mag
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -183,7 +183,7 @@ GameObject:
   - component: {fileID: 3580890031941727803}
   - component: {fileID: 293228082761672791}
   - component: {fileID: 4159736380128796368}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: AR_E_Receiver
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -269,7 +269,7 @@ GameObject:
   - component: {fileID: 4447855721716166816}
   - component: {fileID: 3275508413801032482}
   - component: {fileID: 5094955921703855660}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: AR_E_Rail
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -353,7 +353,11 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4190122475409431863}
-  m_Layer: 0
+  - component: {fileID: 6135480247385358590}
+  - component: {fileID: 4981814143097861929}
+  - component: {fileID: 8779545678272498419}
+  - component: {fileID: 1180912083431893074}
+  m_Layer: 7
   m_Name: AR_E
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -381,6 +385,109 @@ Transform:
   - {fileID: 1977451825270966309}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &6135480247385358590
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3561677274960398221}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.13743973, y: 0.44102883, z: 1.0314956}
+  m_Center: {x: 0.0026779175, y: 0.019977659, z: -0.0045632124}
+--- !u!54 &4981814143097861929
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3561677274960398221}
+  serializedVersion: 4
+  m_Mass: 1
+  m_Drag: 0
+  m_AngularDrag: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
+--- !u!114 &8779545678272498419
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3561677274960398221}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f9af8a2ee48b475898f1f8b9be379ca8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &1180912083431893074
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3561677274960398221}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c43abbc2c8d743cea4b6da818b489eb7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  weaponData:
+    weaponName: FAMAS
+    damage: 25
+    fireRate: 600
+    range: 100
+    maxAmmo: 30
+    reloadTime: 2
+    bulletSpeed: 50
+    spread: 0.02
+    isFullAuto: 0
+    isShotgun: 0
+    pelletCount: 8
+    pelletSpread: 0.15
+  bulletData:
+    lifetime: 5
+    maxBounces: 2
+    bounceForce: 0.5
+    hitLayers:
+      serializedVersion: 2
+      m_Bits: 4294967295
+  effectData:
+    muzzleFlashPrefab: {fileID: 100006, guid: 30b4cc2728d8cec499fad63ba93785a4, type: 3}
+    impactEffectPrefab: {fileID: 100002, guid: 99c73c92ac40473459640b165473206f, type: 3}
+    decalPrefab: {fileID: 8818368308428250104, guid: c47b8b014a4a68a47b87fe78bb7d179e, type: 3}
+    bulletTrailPrefab: {fileID: 6448310529509437964, guid: 7f65b8473baaa1d4a85c7a75d03c897f, type: 3}
+    decalLifetime: 10
+    fireSound: {fileID: 0}
+    reloadSound: {fileID: 0}
+  firePoint: {fileID: 0}
+  bulletPrefab: {fileID: 8489818951931819000, guid: 76d6965a82c700547ac9c860a6e92ca9, type: 3}
+  audioSource: {fileID: 0}
 --- !u!1 &6931394419300207530
 GameObject:
   m_ObjectHideFlags: 0
@@ -392,7 +499,7 @@ GameObject:
   - component: {fileID: 5665280815710227065}
   - component: {fileID: 4314819392627986178}
   - component: {fileID: 2019376521802425353}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: AR_E_Bolt
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -478,7 +585,7 @@ GameObject:
   - component: {fileID: 1977451825270966309}
   - component: {fileID: 3191156255731999042}
   - component: {fileID: 1346693669636600949}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: AR_E_Trigger
   m_TagString: Untagged
   m_Icon: {fileID: 0}

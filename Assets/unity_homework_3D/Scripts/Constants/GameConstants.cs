@@ -32,6 +32,14 @@ namespace Constants
             public const float MUZZLE_FLASH_LIFETIME = 0.5f;
         }
         
+        public static class Collectibles
+        {
+            public const float BOB_SPEED = 1f;
+            public const float BOB_HEIGHT = 0.05f;
+            public const float HEIGHT_OFFSET = 0.3f;
+            public const float HIGHLIGHT_INTENSITY = 1.5f;
+        }
+        
         public static class Trails
         {
             public const float DEFAULT_SPEED = 500f;
