@@ -40,6 +40,7 @@ namespace Player
         private RaycastHit _groundHit;
         private float _currentSlopeAngle;
 
+        // Input state
         private Vector2 _movementInput;
         private Vector2 _lookInput;
         private bool _jumpInput;
@@ -54,46 +55,22 @@ namespace Player
             _inputActions = new InputSystem();
             _controller = GetComponent<CharacterController>();
 
-            // Get weapon owner if not assigned
             if (!weaponOwner)
                 weaponOwner = GetComponent<WeaponOwner>();
 
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            SetCursorState(true);
         }
 
         private void OnEnable()
         {
             _inputActions.Player.Enable();
-
-            _inputActions.Player.Move.performed += OnMove;
-            _inputActions.Player.Move.canceled += OnMove;
-            _inputActions.Player.Look.performed += OnLook;
-            _inputActions.Player.Jump.performed += OnJump;
-            _inputActions.Player.Jump.canceled += OnJump;
-            _inputActions.Player.Sprint.performed += OnSprint;
-            _inputActions.Player.Sprint.canceled += OnSprint;
-            _inputActions.Player.Attack.started += OnAttackStarted;
-            _inputActions.Player.Attack.canceled += OnAttackCanceled;
-            _inputActions.Player.Reload.performed += OnReload;
-            _inputActions.Player.Interact.performed += OnInteract;
+            SubscribeToInputEvents();
         }
 
         private void OnDisable()
         {
+            UnsubscribeFromInputEvents();
             _inputActions.Player.Disable();
-
-            _inputActions.Player.Move.performed -= OnMove;
-            _inputActions.Player.Move.canceled -= OnMove;
-            _inputActions.Player.Look.performed -= OnLook;
-            _inputActions.Player.Jump.performed -= OnJump;
-            _inputActions.Player.Jump.canceled -= OnJump;
-            _inputActions.Player.Sprint.performed -= OnSprint;
-            _inputActions.Player.Sprint.canceled -= OnSprint;
-            _inputActions.Player.Attack.started -= OnAttackStarted;
-            _inputActions.Player.Attack.canceled -= OnAttackCanceled;
-            _inputActions.Player.Reload.performed -= OnReload;
-            _inputActions.Player.Interact.performed -= OnInteract;
         }
 
         private void Update()
@@ -105,24 +82,61 @@ namespace Player
             HandleParticleEffects();
         }
 
+        private void SubscribeToInputEvents()
+        {
+            var player = _inputActions.Player;
+            
+            player.Move.performed += OnMove;
+            player.Move.canceled += OnMove;
+            player.Look.performed += OnLook;
+            player.Jump.performed += OnJump;
+            player.Jump.canceled += OnJump;
+            player.Sprint.performed += OnSprint;
+            player.Sprint.canceled += OnSprint;
+            player.Attack.started += OnAttackStarted;
+            player.Attack.canceled += OnAttackCanceled;
+            player.Reload.performed += OnReload;
+            player.Interact.performed += OnInteract;
+        }
+
+        private void UnsubscribeFromInputEvents()
+        {
+            var player = _inputActions.Player;
+            
+            player.Move.performed -= OnMove;
+            player.Move.canceled -= OnMove;
+            player.Look.performed -= OnLook;
+            player.Jump.performed -= OnJump;
+            player.Jump.canceled -= OnJump;
+            player.Sprint.performed -= OnSprint;
+            player.Sprint.canceled -= OnSprint;
+            player.Attack.started -= OnAttackStarted;
+            player.Attack.canceled -= OnAttackCanceled;
+            player.Reload.performed -= OnReload;
+            player.Interact.performed -= OnInteract;
+        }
+
         private void HandleGroundCheck()
         {
             Vector3 rayStart = transform.position + Vector3.down * GameConstants.Movement.GROUND_CHECK_OFFSET;
+            
             bool centerRay = Physics.Raycast(rayStart, Vector3.down, out _groundHit, raycastDistance, groundMask);
-
-            bool frontRay = Physics.Raycast(rayStart + transform.forward * GameConstants.Movement.GROUND_CHECK_SIDE_OFFSET, 
-                Vector3.down, raycastDistance * GameConstants.Movement.GROUND_CHECK_SIDE_MULTIPLIER, groundMask);
-            bool backRay = Physics.Raycast(rayStart - transform.forward * GameConstants.Movement.GROUND_CHECK_SIDE_OFFSET, 
-                Vector3.down, raycastDistance * GameConstants.Movement.GROUND_CHECK_SIDE_MULTIPLIER, groundMask);
-            bool leftRay = Physics.Raycast(rayStart - transform.right * GameConstants.Movement.GROUND_CHECK_SIDE_OFFSET, 
-                Vector3.down, raycastDistance * GameConstants.Movement.GROUND_CHECK_SIDE_MULTIPLIER, groundMask);
-            bool rightRay = Physics.Raycast(rayStart + transform.right * GameConstants.Movement.GROUND_CHECK_SIDE_OFFSET, 
-                Vector3.down, raycastDistance * GameConstants.Movement.GROUND_CHECK_SIDE_MULTIPLIER, groundMask);
-
-            _isGrounded = centerRay || frontRay || backRay || leftRay || rightRay;
-
+            bool sideRaysHit = CheckSideRays(rayStart);
+            
+            _isGrounded = centerRay || sideRaysHit;
             _currentSlopeAngle = centerRay && _groundHit.normal != Vector3.zero ? 
                 Vector3.Angle(_groundHit.normal, Vector3.up) : 0f;
+        }
+
+        private bool CheckSideRays(Vector3 rayStart)
+        {
+            float sideOffset = GameConstants.Movement.GROUND_CHECK_SIDE_OFFSET;
+            float sideDistance = raycastDistance * GameConstants.Movement.GROUND_CHECK_SIDE_MULTIPLIER;
+            
+            return Physics.Raycast(rayStart + transform.forward * sideOffset, Vector3.down, sideDistance, groundMask) ||
+                   Physics.Raycast(rayStart - transform.forward * sideOffset, Vector3.down, sideDistance, groundMask) ||
+                   Physics.Raycast(rayStart - transform.right * sideOffset, Vector3.down, sideDistance, groundMask) ||
+                   Physics.Raycast(rayStart + transform.right * sideOffset, Vector3.down, sideDistance, groundMask);
         }
 
         private void HandleMovement()
@@ -130,6 +144,7 @@ namespace Player
             Vector3 direction = transform.right * _movementInput.x + transform.forward * _movementInput.y;
             float currentSpeed = _sprintInput ? runSpeed : walkSpeed;
 
+            // Handle slope sliding
             if (_isGrounded && _currentSlopeAngle > maxSlopeAngle)
             {
                 Vector3 slideDirection = Vector3.ProjectOnPlane(Vector3.down, _groundHit.normal).normalized;
@@ -137,7 +152,9 @@ namespace Player
                 return;
             }
 
-            if (!_isGrounded) currentSpeed *= airControl;
+            // Apply air control
+            if (!_isGrounded) 
+                currentSpeed *= airControl;
 
             _controller.Move(direction * (currentSpeed * Time.deltaTime));
         }
@@ -176,6 +193,7 @@ namespace Player
 
         private void HandleParticleEffects()
         {
+            // Landing particles
             if (_isGrounded && _velocity.y <= landingVelocityThreshold && 
                 Time.time - _lastLandingTime > GameConstants.Movement.LANDING_TIME_THRESHOLD && landingParticles)
             {
@@ -183,23 +201,31 @@ namespace Player
                 _lastLandingTime = Time.time;
             }
 
+            // Sprint wind effect
             if (sprintWindEffect)
             {
-                bool shouldPlayWind = _sprintInput && _isGrounded && _movementInput.magnitude > GameConstants.Movement.MOVEMENT_INPUT_THRESHOLD;
+                bool shouldPlayWind = _sprintInput && _isGrounded && 
+                    _movementInput.magnitude > GameConstants.Movement.MOVEMENT_INPUT_THRESHOLD;
                 
-                if (shouldPlayWind && !_wasSprintingLastFrame)
+                if (shouldPlayWind != _wasSprintingLastFrame)
                 {
-                    sprintWindEffect.Play();
-                }
-                else if (!shouldPlayWind && _wasSprintingLastFrame)
-                {
-                    sprintWindEffect.Stop();
+                    if (shouldPlayWind)
+                        sprintWindEffect.Play();
+                    else
+                        sprintWindEffect.Stop();
                 }
 
                 _wasSprintingLastFrame = shouldPlayWind;
             }
         }
 
+        private void SetCursorState(bool locked)
+        {
+            Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
+            Cursor.visible = !locked;
+        }
+
+        // Input event handlers
         private void OnMove(InputAction.CallbackContext context) => _movementInput = context.ReadValue<Vector2>();
         
         private void OnLook(InputAction.CallbackContext context) => _lookInput = context.performed ? context.ReadValue<Vector2>() : Vector2.zero;
@@ -210,42 +236,30 @@ namespace Player
         
         private void OnAttackStarted(InputAction.CallbackContext context)
         {
-            if (!weaponOwner || !weaponOwner.HasWeapon) return;
+            if (!weaponOwner?.HasWeapon == true) return;
             
             if (weaponOwner.CanFire())
-            {
                 weaponOwner.Fire();
-            }
             
             if (weaponOwner.CurrentWeapon?.IsFullAuto == true)
-            {
                 weaponOwner.StartFiring();
-            }
         }
         
         private void OnAttackCanceled(InputAction.CallbackContext context)
         {
-            if (weaponOwner && weaponOwner.HasWeapon)
-            {
+            if (weaponOwner?.HasWeapon == true)
                 weaponOwner.StopFiring();
-            }
         }
         
         private void OnReload(InputAction.CallbackContext context)
         {
-            if (context.performed && weaponOwner && weaponOwner.HasWeapon)
-            {
+            if (weaponOwner?.HasWeapon == true)
                 weaponOwner.Reload();
-            }
         }
         
         private void OnInteract(InputAction.CallbackContext context)
         {
-            // Handle both started and performed for Hold interaction
-            if (context.started || context.performed)
-            {
-                weaponOwner?.TryPickupWeapon();
-            }
+            weaponOwner?.TryPickupWeapon();
         }
     }
 }

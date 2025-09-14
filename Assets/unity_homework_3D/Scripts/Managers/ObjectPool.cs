@@ -22,13 +22,11 @@ namespace Managers
 
         private void Awake()
         {
-            // Singleton pattern
             if (Instance == null)
             {
                 Instance = this;
                 
-                // For DontDestroyOnLoad we need to work with the root object
-                // Find the root object (Managers) and make it persistent
+                // Find root object and make persistent
                 Transform rootTransform = transform;
                 while (rootTransform.parent != null)
                 {
@@ -40,7 +38,7 @@ namespace Managers
             }
             else
             {
-                // Destroy the entire root object if duplicate
+                // Destroy duplicate
                 Transform rootToDestroy = transform;
                 while (rootToDestroy.parent != null)
                 {
@@ -78,34 +76,55 @@ namespace Managers
                 return null;
             }
 
-            GameObject objectToSpawn;
-            
+            GameObject objectToSpawn = GetPooledObject(tag);
+            if (!objectToSpawn) return null;
+
+            SetupSpawnedObject(objectToSpawn, position, rotation);
+            return objectToSpawn;
+        }
+
+        // Generic typed version - more efficient
+        public T SpawnFromPool<T>(string tag, Vector3 position, Quaternion rotation) where T : Component
+        {
+            GameObject obj = SpawnFromPool(tag, position, rotation);
+            return obj?.GetComponent<T>();
+        }
+
+        // Overload for direct component initialization
+        public T SpawnFromPool<T>(string tag, Vector3 position, Quaternion rotation, System.Action<T> initializeAction) where T : Component
+        {
+            T component = SpawnFromPool<T>(tag, position, rotation);
+            initializeAction?.Invoke(component);
+            return component;
+        }
+
+        private GameObject GetPooledObject(string tag)
+        {
             if (_poolDictionary[tag].Count > 0)
             {
-                objectToSpawn = _poolDictionary[tag].Dequeue();
+                return _poolDictionary[tag].Dequeue();
             }
-            else
+
+            // Pool is empty, create new object
+            var pool = pools.Find(p => p.tag == tag);
+            if (pool.prefab == null)
             {
-                // Pool is empty, create new object
-                var pool = pools.Find(p => p.tag == tag);
-                if (pool.prefab == null)
-                {
-                    Debug.LogError($"No prefab found for pool tag {tag}");
-                    return null;
-                }
-                objectToSpawn = Instantiate(pool.prefab, transform);
+                Debug.LogError($"No prefab found for pool tag {tag}");
+                return null;
             }
 
-            objectToSpawn.SetActive(true);
-            objectToSpawn.transform.position = position;
-            objectToSpawn.transform.rotation = rotation;
-            objectToSpawn.transform.SetParent(null); // Remove from pool parent when active
+            return Instantiate(pool.prefab, transform);
+        }
 
-            // Reset any pooled object components
-            var pooledObject = objectToSpawn.GetComponent<IPooledObject>();
-            pooledObject?.OnObjectSpawn();
+        private void SetupSpawnedObject(GameObject obj, Vector3 position, Quaternion rotation)
+        {
+            obj.SetActive(true);
+            obj.transform.position = position;
+            obj.transform.rotation = rotation;
+            obj.transform.SetParent(null); // Remove from pool parent when active
 
-            return objectToSpawn;
+            // Reset pooled object
+            obj.GetComponent<IPooledObject>()?.OnObjectSpawn();
         }
 
         public void ReturnToPool(string tag, GameObject objectToReturn)
@@ -122,17 +141,48 @@ namespace Managers
             _poolDictionary[tag].Enqueue(objectToReturn);
         }
 
-        // Utility method to check if pool exists
-        public bool HasPool(string tag)
-        {
-            return _poolDictionary != null && _poolDictionary.ContainsKey(tag);
-        }
+        // Utility methods
+        public bool HasPool(string tag) => _poolDictionary != null && _poolDictionary.ContainsKey(tag);
 
-        // Utility method to get pool size
         public int GetPoolSize(string tag)
         {
-            if (!_poolDictionary.ContainsKey(tag)) return 0;
-            return _poolDictionary[tag].Count;
+            return _poolDictionary.ContainsKey(tag) ? _poolDictionary[tag].Count : 0;
+        }
+
+        // Spawn object that auto-returns to pool after specified time
+        public GameObject SpawnFromPoolTimed(string tag, Vector3 position, Quaternion rotation, float lifetime)
+        {
+            GameObject obj = SpawnFromPool(tag, position, rotation);
+            if (obj)
+            {
+                StartCoroutine(ReturnAfterDelay(tag, obj, lifetime));
+            }
+            return obj;
+        }
+        
+        // Generic typed version with auto-return
+        public T SpawnFromPoolTimed<T>(string tag, Vector3 position, Quaternion rotation, float lifetime) where T : Component
+        {
+            GameObject obj = SpawnFromPoolTimed(tag, position, rotation, lifetime);
+            return obj?.GetComponent<T>();
+        }
+        
+        // Typed version with initialization and auto-return
+        public T SpawnFromPoolTimed<T>(string tag, Vector3 position, Quaternion rotation, float lifetime, System.Action<T> initializeAction) where T : Component
+        {
+            T component = SpawnFromPoolTimed<T>(tag, position, rotation, lifetime);
+            initializeAction?.Invoke(component);
+            return component;
+        }
+        
+        private System.Collections.IEnumerator ReturnAfterDelay(string tag, GameObject obj, float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            
+            if (obj) // Check if object still exists
+            {
+                ReturnToPool(tag, obj);
+            }
         }
     }
 

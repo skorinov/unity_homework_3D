@@ -19,31 +19,10 @@ public struct WeaponData
     public float pelletSpread;
 }
 
-[System.Serializable]
-public struct BulletData
-{
-    public float lifetime;
-    public int maxBounces;
-    public float bounceForce;
-    public LayerMask hitLayers;
-}
-
-[System.Serializable]
-public struct EffectData
-{
-    public GameObject muzzleFlashPrefab;
-    public GameObject impactEffectPrefab;
-    public GameObject decalPrefab;
-    public GameObject bulletTrailPrefab;
-    public float decalLifetime;
-    public AudioClip fireSound;
-    public AudioClip reloadSound;
-}
-
 namespace Weapons
 {
     /// <summary>
-    /// Simplified weapon system using direct configuration
+    /// Universal weapon system with infinite ammo support for AI
     /// </summary>
     public class Weapon : MonoBehaviour
     {
@@ -64,40 +43,36 @@ namespace Weapons
             pelletSpread = 0.15f
         };
         
-        public BulletData bulletData = new BulletData 
-        { 
-            lifetime = GameConstants.Bullets.DEFAULT_LIFETIME, 
-            maxBounces = GameConstants.Bullets.DEFAULT_MAX_BOUNCES, 
-            bounceForce = GameConstants.Bullets.DEFAULT_BOUNCE_FORCE, 
-            hitLayers = -1 
-        };
-        
-        public EffectData effectData;
-        
         [Header("References")]
         public Transform firePoint;
-        public GameObject bulletPrefab;
-        [SerializeField] private AudioSource audioSource;
         
         // Runtime state
-        protected int _currentAmmo;
-        protected float _nextFireTime;
-        protected bool _isReloading;
+        private int _currentAmmo;
+        private float _nextFireTime;
+        private bool _isReloading;
         private bool _isFullAutoFiring;
-        protected Camera _playerCamera;
+        private IWeaponUser _weaponUser;
+        private GameObject _actualOwner;
+        
+        // Cached values for performance
+        private Vector3 _screenCenter;
+        private bool _screenCenterCached;
         
         // Properties
         public int CurrentAmmo => _currentAmmo;
         public int MaxAmmo => weaponData.maxAmmo;
         public bool IsReloading => _isReloading;
-        public bool CanFire => !_isReloading && Time.time >= _nextFireTime && _currentAmmo > 0;
+        public bool CanFire => !_isReloading && Time.time >= _nextFireTime && HasAmmo() && _weaponUser?.CanUseWeapon == true;
         public string WeaponName => weaponData.weaponName;
         public bool IsFullAuto => weaponData.isFullAuto;
+        public IWeaponUser WeaponUser => _weaponUser;
         
-        protected virtual void Start()
+        private bool HasAmmo() => _weaponUser?.HasInfiniteAmmo == true || _currentAmmo > 0;
+        
+        private void Start()
         {
             _currentAmmo = weaponData.maxAmmo;
-            _playerCamera = Camera.main;
+            CacheScreenCenter();
         }
         
         private void Update()
@@ -106,11 +81,32 @@ namespace Weapons
                 Fire();
         }
         
+        private void CacheScreenCenter()
+        {
+            if (!_screenCenterCached)
+            {
+                _screenCenter = new Vector3(
+                    Screen.width * GameConstants.Weapons.SCREEN_CENTER_X, 
+                    Screen.height * GameConstants.Weapons.SCREEN_CENTER_Y, 
+                    0f);
+                _screenCenterCached = true;
+            }
+        }
+        
+        public void SetWeaponUser(IWeaponUser user)
+        {
+            _weaponUser = user;
+            _actualOwner = (user as MonoBehaviour)?.gameObject;
+        }
+        
         public virtual void Fire()
         {
             if (!CanFire) return;
 
-            _currentAmmo--;
+            // Consume ammo only if not infinite
+            if (_weaponUser?.HasInfiniteAmmo != true)
+                _currentAmmo--;
+                
             _nextFireTime = Time.time + (60f / weaponData.fireRate);
 
             if (weaponData.isShotgun)
@@ -119,13 +115,14 @@ namespace Weapons
                 FireSingleBullet();
             
             PlayEffects();
+            _weaponUser?.OnWeaponFired();
         }
         
         private void FireSingleBullet()
         {
             Vector3 targetPoint = GetTargetPoint();
             CreateBullet(targetPoint);
-            CreateBulletTrail(firePoint.position, targetPoint);
+            CreateBulletTrail(GetFirePoint().position, targetPoint);
         }
         
         private void FireShotgun()
@@ -134,114 +131,165 @@ namespace Weapons
             
             for (int i = 0; i < weaponData.pelletCount; i++)
             {
-                Vector3 targetPoint = GetShotgunTargetPoint();
-                CreateBullet(targetPoint);
+                CreateBullet(GetShotgunTargetPoint());
             }
             
-            CreateBulletTrail(firePoint.position, centerTarget);
+            CreateBulletTrail(GetFirePoint().position, centerTarget);
         }
         
-        protected virtual Vector3 GetTargetPoint()
+        private Vector3 GetTargetPoint()
         {
-            Vector3 screenCenter = new Vector3(
-                Screen.width * GameConstants.Weapons.SCREEN_CENTER_X, 
-                Screen.height * GameConstants.Weapons.SCREEN_CENTER_Y, 
-                0f);
-            Ray cameraRay = _playerCamera.ScreenPointToRay(screenCenter);
+            var targetProvider = _weaponUser?.TargetProvider;
+            if (targetProvider?.HasValidTarget() == true)
+            {
+                return GetDirectTargetPoint(targetProvider);
+            }
             
-            Vector3 direction = AddSpread(cameraRay.direction);
-            Ray spreadRay = new Ray(cameraRay.origin, direction);
+            var userCamera = _weaponUser?.UserCamera;
+            if (userCamera)
+            {
+                Ray cameraRay = userCamera.ScreenPointToRay(_screenCenter);
+                Vector3 shootDirection = AddSpread(cameraRay.direction);
+                Ray spreadRay = new Ray(cameraRay.origin, shootDirection);
+                
+                LayerMask hitLayers = _weaponUser?.TargetLayers ?? GameConstants.Bullets.DEFAULT_HIT_LAYERS;
+                if (Physics.Raycast(spreadRay, out RaycastHit hit, weaponData.range, hitLayers))
+                    return hit.point;
+                
+                return spreadRay.origin + spreadRay.direction * weaponData.range;
+            }
             
-            if (Physics.Raycast(spreadRay, out RaycastHit hit, weaponData.range, bulletData.hitLayers))
+            Transform firePoint = GetFirePoint();
+            return firePoint.position + firePoint.forward * weaponData.range;
+        }
+        
+        private Vector3 GetDirectTargetPoint(ITargetProvider targetProvider)
+        {
+            Transform firePoint = GetFirePoint();
+            Vector3 targetPos = targetProvider.GetAimPoint();
+            
+            Vector3 aimDirection = (targetPos - firePoint.position).normalized;
+            aimDirection = AddSpread(aimDirection);
+            
+            LayerMask hitLayers = _weaponUser?.TargetLayers ?? GameConstants.Bullets.DEFAULT_HIT_LAYERS;
+            if (Physics.Raycast(firePoint.position, aimDirection, out RaycastHit hit, weaponData.range, hitLayers))
                 return hit.point;
             
-            return spreadRay.origin + spreadRay.direction * weaponData.range;
+            return firePoint.position + aimDirection * weaponData.range;
         }
         
         private Vector3 GetShotgunTargetPoint()
         {
-            Vector3 screenCenter = new Vector3(
-                Screen.width * GameConstants.Weapons.SCREEN_CENTER_X, 
-                Screen.height * GameConstants.Weapons.SCREEN_CENTER_Y, 
-                0f);
-            Ray cameraRay = _playerCamera.ScreenPointToRay(screenCenter);
+            var targetProvider = _weaponUser?.TargetProvider;
+            if (targetProvider?.HasValidTarget() == true)
+            {
+                Vector3 baseTarget = targetProvider.GetAimPoint();
+                Vector3 shotgunDirection = (baseTarget - GetFirePoint().position).normalized;
+                return GetFirePoint().position + AddShotgunSpread(shotgunDirection) * weaponData.range;
+            }
             
-            Vector3 direction = AddShotgunSpread(cameraRay.direction);
-            Ray spreadRay = new Ray(cameraRay.origin, direction);
+            var userCamera = _weaponUser?.UserCamera;
+            if (userCamera)
+            {
+                Ray cameraRay = userCamera.ScreenPointToRay(_screenCenter);
+                Vector3 pelletDirection = AddShotgunSpread(cameraRay.direction);
+                Ray spreadRay = new Ray(cameraRay.origin, pelletDirection);
+                
+                LayerMask hitLayers = _weaponUser?.TargetLayers ?? GameConstants.Bullets.DEFAULT_HIT_LAYERS;
+                if (Physics.Raycast(spreadRay, out RaycastHit hit, weaponData.range, hitLayers))
+                    return hit.point;
+                
+                return spreadRay.origin + spreadRay.direction * weaponData.range;
+            }
             
-            if (Physics.Raycast(spreadRay, out RaycastHit hit, weaponData.range, bulletData.hitLayers))
-                return hit.point;
-            
-            return spreadRay.origin + spreadRay.direction * weaponData.range;
+            return GetFirePoint().position + GetFirePoint().forward * weaponData.range;
         }
         
-        protected virtual Vector3 AddSpread(Vector3 direction)
+        private Vector3 AddSpread(Vector3 baseDirection)
         {
-            Vector3 right = _playerCamera.transform.right;
-            Vector3 up = _playerCamera.transform.up;
+            var userCamera = _weaponUser?.UserCamera;
+            if (!userCamera) 
+            {
+                Vector3 randomSpread = Random.insideUnitSphere * weaponData.spread;
+                return (baseDirection + randomSpread).normalized;
+            }
+            
+            Vector3 right = userCamera.transform.right;
+            Vector3 up = userCamera.transform.up;
             
             Vector3 spreadVector = right * Random.Range(-weaponData.spread, weaponData.spread) +
                                  up * Random.Range(-weaponData.spread, weaponData.spread);
             
-            return (direction + spreadVector).normalized;
+            return (baseDirection + spreadVector).normalized;
         }
         
-        private Vector3 AddShotgunSpread(Vector3 direction)
+        private Vector3 AddShotgunSpread(Vector3 baseDirection)
         {
-            Vector3 right = _playerCamera.transform.right;
-            Vector3 up = _playerCamera.transform.up;
+            var userCamera = _weaponUser?.UserCamera;
+            if (!userCamera)
+            {
+                Vector3 randomSpread = Random.insideUnitSphere * weaponData.pelletSpread;
+                return (baseDirection + randomSpread).normalized;
+            }
+            
+            Vector3 right = userCamera.transform.right;
+            Vector3 up = userCamera.transform.up;
             
             Vector3 spread = right * Random.Range(-weaponData.pelletSpread, weaponData.pelletSpread) +
                            up * Random.Range(-weaponData.pelletSpread, weaponData.pelletSpread);
             
-            return (direction + spread).normalized;
+            return (baseDirection + spread).normalized;
         }
         
-        protected virtual void CreateBullet(Vector3 targetPoint)
+        private void CreateBullet(Vector3 targetPoint)
         {
-            if (!bulletPrefab) return;
-            
-            Vector3 direction = (targetPoint - firePoint.position).normalized;
-            
-            GameObject bullet;
-            if (ObjectPool.Instance?.HasPool(GameConstants.Pools.BULLET) == true)
-                bullet = ObjectPool.Instance.SpawnFromPool(GameConstants.Pools.BULLET, firePoint.position, Quaternion.LookRotation(direction));
-            else
-                bullet = Instantiate(bulletPrefab, firePoint.position, Quaternion.LookRotation(direction));
-            
-            bullet?.GetComponent<PhysicsBullet>()?.Initialize(targetPoint, weaponData.bulletSpeed, bulletData, effectData, weaponData.damage);
+            Transform currentFirePoint = GetFirePoint();
+            Vector3 bulletDirection = (targetPoint - currentFirePoint.position).normalized;
+    
+            // Determine if this is a player bullet based on weapon user type
+            bool isPlayerBullet = _weaponUser is Player.WeaponOwner; // Direct type check
+    
+            ObjectPool.Instance?.SpawnFromPool<PhysicsBullet>(
+                GameConstants.Pools.BULLET, 
+                currentFirePoint.position, 
+                Quaternion.LookRotation(bulletDirection),
+                bullet => bullet.Initialize(
+                    targetPoint, 
+                    weaponData.bulletSpeed, 
+                    weaponData.damage, 
+                    isPlayerBullet
+                )
+            );
         }
         
-        protected virtual void CreateBulletTrail(Vector3 startPoint, Vector3 endPoint)
+        private void CreateBulletTrail(Vector3 startPoint, Vector3 endPoint)
         {
-            if (!effectData.bulletTrailPrefab) return;
-            
-            GameObject trail;
-            if (ObjectPool.Instance?.HasPool(GameConstants.Pools.BULLET_TRAIL) == true)
-                trail = ObjectPool.Instance.SpawnFromPool(GameConstants.Pools.BULLET_TRAIL, Vector3.zero, Quaternion.identity);
-            else
-                trail = Instantiate(effectData.bulletTrailPrefab);
-            
-            trail?.GetComponent<BulletTrail>()?.Initialize(startPoint, endPoint);
+            ObjectPool.Instance?.SpawnFromPool<BulletTrail>(
+                GameConstants.Pools.BULLET_TRAIL, 
+                Vector3.zero, 
+                Quaternion.identity,
+                trail => trail.Initialize(startPoint, endPoint)
+            );
         }
         
-        protected virtual void PlayMuzzleFlash()
+        private void PlayMuzzleFlash()
         {
-            if (!effectData.muzzleFlashPrefab) return;
-            
-            GameObject flash = Instantiate(effectData.muzzleFlashPrefab, firePoint.position, firePoint.rotation);
-            flash.transform.SetParent(firePoint);
-            
-            Destroy(flash, GameConstants.Weapons.MUZZLE_FLASH_LIFETIME);
+            Transform currentFirePoint = GetFirePoint();
+            ObjectPool.Instance?.SpawnFromPoolTimed(
+                GameConstants.Pools.MUZZLE_FLASH, 
+                currentFirePoint.position, 
+                currentFirePoint.rotation,
+                GameConstants.Weapons.MUZZLE_FLASH_LIFETIME
+            )?.transform.SetParent(currentFirePoint);
         }
         
         private void PlayEffects()
         {
-            if (audioSource && effectData.fireSound)
-                audioSource.PlayOneShot(effectData.fireSound);
-            
+            AudioManager.Instance?.PlayWeaponFire();
             PlayMuzzleFlash();
         }
+        
+        private Transform GetFirePoint() => firePoint ? firePoint : (_weaponUser?.FirePoint ?? transform);
         
         public void StartFiring()
         {
@@ -249,28 +297,29 @@ namespace Weapons
                 _isFullAutoFiring = true;
         }
         
-        public void StopFiring()
-        {
-            _isFullAutoFiring = false;
-        }
+        public void StopFiring() => _isFullAutoFiring = false;
         
         public virtual void StartReload()
         {
-            if (_isReloading || _currentAmmo == weaponData.maxAmmo) return;
+            // Skip reload if infinite ammo or already full
+            if (_weaponUser?.HasInfiniteAmmo == true || _isReloading || _currentAmmo == weaponData.maxAmmo) 
+                return;
+                
             StartCoroutine(ReloadCoroutine());
         }
         
-        protected virtual System.Collections.IEnumerator ReloadCoroutine()
+        private System.Collections.IEnumerator ReloadCoroutine()
         {
             _isReloading = true;
             
-            if (audioSource && effectData.reloadSound)
-                audioSource.PlayOneShot(effectData.reloadSound);
+            AudioManager.Instance?.PlayWeaponReload();
             
             yield return new WaitForSeconds(weaponData.reloadTime);
             
             _currentAmmo = weaponData.maxAmmo;
             _isReloading = false;
+            
+            _weaponUser?.OnWeaponReloaded();
         }
     }
 }

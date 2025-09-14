@@ -3,6 +3,9 @@ using UnityEngine;
 
 namespace Managers
 {
+    /// <summary>
+    /// Manages decal lifecycle with fade out and pool return
+    /// </summary>
     public class DecalManager : MonoBehaviour, IPooledObject
     {
         private float _lifetime;
@@ -14,13 +17,7 @@ namespace Managers
         private void Awake()
         {
             _renderer = GetComponent<Renderer>();
-            
-            if (_renderer?.material)
-            {
-                _material = new Material(_renderer.material);
-                _renderer.material = _material;
-                _originalColor = _material.color;
-            }
+            SetupMaterial();
         }
         
         public void OnObjectSpawn()
@@ -40,22 +37,23 @@ namespace Managers
             StartCoroutine(DestroySequence());
         }
         
+        private void SetupMaterial()
+        {
+            if (_renderer?.material)
+            {
+                _material = new Material(_renderer.material);
+                _renderer.material = _material;
+                _originalColor = _material.color;
+            }
+        }
+        
         private System.Collections.IEnumerator DestroySequence()
         {
             yield return new WaitForSeconds(_lifetime - _fadeTime);
             
             if (_material)
             {
-                float fadeTimer = 0f;
-                while (fadeTimer < _fadeTime)
-                {
-                    fadeTimer += Time.deltaTime;
-                    float alpha = Mathf.Lerp(_originalColor.a, 0f, fadeTimer / _fadeTime);
-                    
-                    _material.color = new Color(_originalColor.r, _originalColor.g, _originalColor.b, alpha);
-                    
-                    yield return null;
-                }
+                yield return StartCoroutine(FadeOut());
             }
             else
             {
@@ -63,6 +61,21 @@ namespace Managers
             }
             
             ReturnToPool();
+        }
+        
+        private System.Collections.IEnumerator FadeOut()
+        {
+            float fadeTimer = 0f;
+            
+            while (fadeTimer < _fadeTime)
+            {
+                fadeTimer += Time.deltaTime;
+                float alpha = Mathf.Lerp(_originalColor.a, 0f, fadeTimer / _fadeTime);
+                
+                _material.color = new Color(_originalColor.r, _originalColor.g, _originalColor.b, alpha);
+                
+                yield return null;
+            }
         }
         
         private void ReturnToPool()
@@ -79,7 +92,8 @@ namespace Managers
         
         private void OnDestroy()
         {
-            if (_material) Destroy(_material);
+            if (_material) 
+                Destroy(_material);
         }
     }
 }

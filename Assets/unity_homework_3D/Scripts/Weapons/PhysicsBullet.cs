@@ -7,11 +7,8 @@ namespace Weapons
     [RequireComponent(typeof(Rigidbody))]
     public class PhysicsBullet : MonoBehaviour, IPooledObject
     {
-        private Vector3 _targetPoint;
-        private float _speed;
         private float _damage;
-        private BulletData _bulletData;
-        private EffectData _effectData;
+        private bool _isPlayerBullet;
         
         private Rigidbody _rigidbody;
         private Renderer _renderer;
@@ -21,10 +18,18 @@ namespace Weapons
         private bool _hasAppliedDamage;
         private float _spawnTime;
         
+        // Cached layer values for performance
+        private int _playerLayer;
+        private int _enemyLayer;
+        
         private void Awake()
         {
             _rigidbody = GetComponent<Rigidbody>();
             _renderer = GetComponent<Renderer>();
+            
+            // Cache layer values
+            _playerLayer = LayerMask.NameToLayer(GameConstants.Layers.PLAYER);
+            _enemyLayer = LayerMask.NameToLayer(GameConstants.Layers.ENEMY);
         }
         
         public void OnObjectSpawn()
@@ -33,18 +38,16 @@ namespace Weapons
             _hasCreatedFirstDecal = false;
             _hasAppliedDamage = false;
             _spawnTime = Time.time;
+            _isPlayerBullet = false;
             
             if (_renderer) _renderer.enabled = true;
             if (_rigidbody) _rigidbody.isKinematic = false;
         }
         
-        public void Initialize(Vector3 targetPoint, float speed, BulletData bulletData, EffectData effectData, float damage)
+        public void Initialize(Vector3 targetPoint, float speed, float damage, bool isPlayerBullet)
         {
-            _targetPoint = targetPoint;
-            _speed = speed;
-            _bulletData = bulletData;
-            _effectData = effectData;
             _damage = damage;
+            _isPlayerBullet = isPlayerBullet;
             
             Vector3 direction = (targetPoint - transform.position).normalized;
             _rigidbody.linearVelocity = direction * speed;
@@ -52,41 +55,57 @@ namespace Weapons
         
         private void Update()
         {
-            if (Time.time - _spawnTime >= _bulletData.lifetime)
+            // Check lifetime
+            if (Time.time - _spawnTime >= GameConstants.Bullets.DEFAULT_LIFETIME)
             {
                 ReturnToPool();
                 return;
             }
             
-            if (_hasCreatedFirstDecal) return;
-            
-            Vector3 velocity = _rigidbody.linearVelocity;
-            if (velocity.magnitude > GameConstants.Movement.MOVEMENT_INPUT_THRESHOLD)
+            // Early raycast for first hit detection
+            if (!_hasCreatedFirstDecal && _rigidbody.linearVelocity.sqrMagnitude > GameConstants.Movement.MOVEMENT_INPUT_THRESHOLD)
             {
-                float rayDistance = velocity.magnitude * Time.deltaTime + GameConstants.Bullets.RAYCAST_DISTANCE_OFFSET;
-                
-                if (Physics.Raycast(transform.position, velocity.normalized, out RaycastHit hit, rayDistance, _bulletData.hitLayers))
+                CheckForHit();
+            }
+        }
+        
+        private void CheckForHit()
+        {
+            Vector3 velocity = _rigidbody.linearVelocity;
+            float rayDistance = velocity.magnitude * Time.deltaTime + GameConstants.Bullets.RAYCAST_DISTANCE_OFFSET;
+            
+            if (Physics.Raycast(transform.position, velocity.normalized, out RaycastHit hit, rayDistance, GameConstants.Bullets.DEFAULT_HIT_LAYERS))
+            {
+                float hitDistance = Vector3.Distance(transform.position, hit.point);
+                if (hitDistance < GameConstants.Bullets.HIT_DISTANCE_THRESHOLD)
                 {
-                    if (Vector3.Distance(transform.position, hit.point) < GameConstants.Bullets.HIT_DISTANCE_THRESHOLD)
-                    {
-                        ProcessFirstHit(hit.point, hit.normal, hit.collider.gameObject);
-                    }
+                    ProcessFirstHit(hit.point, hit.normal, hit.collider.gameObject);
                 }
             }
         }
         
         private void OnCollisionEnter(Collision collision)
         {
-            if (!IsValidHit(collision.gameObject)) return;
+            GameObject hitObject = collision.gameObject;
+            int hitLayer = hitObject.layer;
+            
+            // Check friendly fire
+            if ((_isPlayerBullet && hitLayer == _playerLayer) || (!_isPlayerBullet && hitLayer == _enemyLayer))
+            {
+                Physics.IgnoreCollision(GetComponent<Collider>(), collision.collider);
+                return;
+            }
+            
+            if (!IsValidHit(hitObject)) return;
             
             ContactPoint contact = collision.contacts[0];
             
             if (!_hasCreatedFirstDecal)
             {
-                ProcessFirstHit(contact.point, contact.normal, collision.gameObject);
+                ProcessFirstHit(contact.point, contact.normal, hitObject);
             }
             
-            if (_bounceCount < _bulletData.maxBounces)
+            if (_bounceCount < GameConstants.Bullets.DEFAULT_MAX_BOUNCES)
             {
                 HandleBounce(collision);
             }
@@ -102,13 +121,55 @@ namespace Weapons
             _hasCreatedFirstDecal = true;
             
             CreateImpactEffect(hitPoint, hitNormal);
-            CreateDecal(hitPoint, hitNormal, surface);
+            
+            if (ShouldCreateDecal(surface))
+            {
+                CreateDecal(hitPoint, hitNormal);
+            }
             
             if (!_hasAppliedDamage)
             {
-                surface.GetComponent<IDamageable>()?.TakeDamage(_damage);
+                ApplyDamage(surface);
                 _hasAppliedDamage = true;
             }
+        }
+        
+        private bool ShouldCreateDecal(GameObject surface)
+        {
+            int surfaceLayer = surface.layer;
+            
+            // No decals on living entities
+            if ((GameConstants.Layers.LIVING_ENTITIES_MASK & (1 << surfaceLayer)) != 0)
+                return false;
+            
+            // Check if surface supports decals
+            if ((GameConstants.Layers.DECAL_SURFACES_MASK & (1 << surfaceLayer)) != 0)
+                return true;
+            
+            // Special case for environment layer
+            if (surfaceLayer == LayerMask.NameToLayer(GameConstants.Layers.ENVIRONMENT))
+            {
+                return surface.GetComponent<IDamageable>() == null && 
+                       surface.GetComponentInParent<IDamageable>() == null;
+            }
+            
+            return false;
+        }
+        
+        private void ApplyDamage(GameObject target)
+        {
+            int targetLayer = target.layer;
+            
+            // Check friendly fire
+            if ((_isPlayerBullet && targetLayer == _playerLayer) || (!_isPlayerBullet && targetLayer == _enemyLayer))
+                return;
+            
+            // Try to find IDamageable component
+            IDamageable damageable = target.GetComponent<IDamageable>() ?? 
+                                   target.GetComponentInParent<IDamageable>() ?? 
+                                   target.GetComponentInChildren<IDamageable>();
+            
+            damageable?.TakeDamage(_damage);
         }
         
         private void StopBullet()
@@ -127,10 +188,14 @@ namespace Weapons
         
         private bool IsValidHit(GameObject hitObject)
         {
-            if (hitObject.layer == LayerMask.NameToLayer(GameConstants.Layers.PLAYER)) return false;
-            if (hitObject.name.Contains(GameConstants.Pools.BULLET_DECAL)) return false;
+            int hitLayer = hitObject.layer;
             
-            return ((1 << hitObject.layer) & _bulletData.hitLayers) != 0;
+            // Ignore bullet decals and other bullets
+            if (hitObject.name.Contains(GameConstants.Pools.BULLET_DECAL) || 
+                hitObject.GetComponent<PhysicsBullet>())
+                return false;
+            
+            return ((1 << hitLayer) & GameConstants.Bullets.DEFAULT_HIT_LAYERS) != 0;
         }
         
         private void HandleBounce(Collision collision)
@@ -141,65 +206,41 @@ namespace Weapons
             Vector3 reflectVector = Vector3.Reflect(incomingVector, collision.contacts[0].normal);
             
             float currentSpeed = _rigidbody.linearVelocity.magnitude;
-            _rigidbody.linearVelocity = reflectVector * (currentSpeed * _bulletData.bounceForce);
+            _rigidbody.linearVelocity = reflectVector * (currentSpeed * GameConstants.Bullets.DEFAULT_BOUNCE_FORCE);
             _rigidbody.angularVelocity = Random.insideUnitSphere * GameConstants.Bullets.ANGULAR_VELOCITY_MULTIPLIER;
         }
         
         private void CreateImpactEffect(Vector3 position, Vector3 normal)
         {
-            if (!_effectData.impactEffectPrefab) return;
-            
             Vector3 effectPosition = position + normal * GameConstants.Bullets.IMPACT_EFFECT_OFFSET;
             Quaternion effectRotation = Quaternion.LookRotation(normal);
             
-            GameObject effect;
-            if (ObjectPool.Instance?.HasPool(GameConstants.Pools.IMPACT_EFFECT) == true)
-            {
-                effect = ObjectPool.Instance.SpawnFromPool(GameConstants.Pools.IMPACT_EFFECT, effectPosition, effectRotation);
-            }
-            else
-            {
-                effect = Instantiate(_effectData.impactEffectPrefab, effectPosition, effectRotation);
-            }
-            
-            if (effect) Destroy(effect, GameConstants.Bullets.IMPACT_EFFECT_LIFETIME);
+            ObjectPool.Instance?.SpawnFromPoolTimed(
+                GameConstants.Pools.IMPACT_EFFECT, 
+                effectPosition, 
+                effectRotation,
+                GameConstants.Bullets.IMPACT_EFFECT_LIFETIME
+            );
         }
         
-        private void CreateDecal(Vector3 hitPoint, Vector3 hitNormal, GameObject surface)
+        private void CreateDecal(Vector3 hitPoint, Vector3 hitNormal)
         {
-            if (!_effectData.decalPrefab) return;
-            
             Vector3 decalPosition = hitPoint + hitNormal * GameConstants.Bullets.DECAL_POSITION_OFFSET;
-            Quaternion decalRotation = Mathf.Abs(hitNormal.y) > 0.7f ? 
-                Quaternion.LookRotation(hitNormal) : 
-                Quaternion.LookRotation(-hitNormal);
+            Quaternion decalRotation = Mathf.Abs(hitNormal.y) > 0.7f 
+                ? Quaternion.LookRotation(hitNormal) 
+                : Quaternion.LookRotation(-hitNormal);
             
-            GameObject decal;
-            if (ObjectPool.Instance?.HasPool(GameConstants.Pools.BULLET_DECAL) == true)
-            {
-                decal = ObjectPool.Instance.SpawnFromPool(GameConstants.Pools.BULLET_DECAL, decalPosition, decalRotation);
-            }
-            else
-            {
-                decal = Instantiate(_effectData.decalPrefab, decalPosition, decalRotation);
-            }
-            
-            if (decal)
-            {
-                float decalSize = Random.Range(GameConstants.Bullets.DECAL_SIZE_MIN, GameConstants.Bullets.DECAL_SIZE_MAX);
-                decal.transform.localScale = Vector3.one * decalSize;
-                decal.transform.Rotate(0, 0, Random.Range(0f, 360f));
-                
-                var decalManager = decal.GetComponent<DecalManager>();
-                if (decalManager && _effectData.decalLifetime > 0)
-                {
-                    decalManager.Initialize(_effectData.decalLifetime);
+            ObjectPool.Instance?.SpawnFromPool<DecalManager>(
+                GameConstants.Pools.BULLET_DECAL, 
+                decalPosition, 
+                decalRotation,
+                decal => {
+                    float decalSize = Random.Range(GameConstants.Bullets.DECAL_SIZE_MIN, GameConstants.Bullets.DECAL_SIZE_MAX);
+                    decal.transform.localScale = Vector3.one * decalSize;
+                    decal.transform.Rotate(0, 0, Random.Range(0f, 360f));
+                    decal.Initialize(GameConstants.Decals.DEFAULT_LIFETIME);
                 }
-                else if (!decalManager && _effectData.decalLifetime > 0)
-                {
-                    decal.AddComponent<DecalManager>().Initialize(_effectData.decalLifetime);
-                }
-            }
+            );
         }
         
         private void ReturnToPool()

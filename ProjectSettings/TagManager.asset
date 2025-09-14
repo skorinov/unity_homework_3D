@@ -3,7 +3,9 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 3
-  tags: []
+  tags:
+  - Enemy
+  - SpawnPoint
   layers:
   - Default
   - TransparentFX
@@ -13,10 +15,10 @@ TagManager:
   - UI
   - Ground
   - Weapon
-  - Walls
+  - Wall
   - Player
   - Bullet
-  - 
+  - Enemy
   - 
   - 
   - 

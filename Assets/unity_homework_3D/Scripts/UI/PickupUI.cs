@@ -14,33 +14,40 @@ namespace UI
         [SerializeField] private TextMeshProUGUI pickupText;
         [SerializeField] private string interactKey = "[E]";
         
-        private bool isShowing;
+        private bool _isShowing;
         
         private void Start()
         {
-            pickupText.gameObject.SetActive(false);
+            if (!weaponOwner)
+                weaponOwner = FindFirstObjectByType<WeaponOwner>();
+            
+            if (pickupText)
+                pickupText.gameObject.SetActive(false);
         }
         
         private void Update()
         {
-            UpdatePickupPrompt();
+            if (weaponOwner)
+                UpdatePickupPrompt();
         }
         
         private void UpdatePickupPrompt()
         {
-            if (!weaponOwner) return;
-            
             bool shouldShow = weaponOwner.HighlightedWeapon != null;
             
-            if (shouldShow != isShowing)
+            if (shouldShow != _isShowing)
             {
-                isShowing = shouldShow;
-                pickupText.gameObject.SetActive(shouldShow);
+                _isShowing = shouldShow;
                 
-                if (shouldShow && pickupText && weaponOwner.HighlightedWeapon)
+                if (pickupText)
                 {
-                    string weaponName = weaponOwner.HighlightedWeapon.WeaponComponent.WeaponName;
-                    pickupText.text = $"{interactKey} Pick up {weaponName}";
+                    pickupText.gameObject.SetActive(shouldShow);
+                    
+                    if (shouldShow && weaponOwner.HighlightedWeapon?.WeaponComponent)
+                    {
+                        string weaponName = weaponOwner.HighlightedWeapon.WeaponComponent.WeaponName;
+                        pickupText.text = $"{interactKey} Pick up {weaponName}";
+                    }
                 }
             }
         }

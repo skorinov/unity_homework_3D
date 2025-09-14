@@ -17,6 +17,7 @@ namespace Constants
             public const float IMPACT_EFFECT_OFFSET = 0.05f;
             public const float IMPACT_EFFECT_LIFETIME = 3f;
             public const float ANGULAR_VELOCITY_MULTIPLIER = 5f;
+            public const int DEFAULT_HIT_LAYERS = -1; // All layers
         }
         
         public static class Weapons
@@ -51,7 +52,7 @@ namespace Constants
         public static class Decals
         {
             public const float DEFAULT_FADE_TIME = 2f;
-            public const float FADE_CHECK_INTERVAL = 0.3f;
+            public const float DEFAULT_LIFETIME = 10f; // How long decals stay
         }
         
         public static class Pools
@@ -60,11 +61,29 @@ namespace Constants
             public const string BULLET_DECAL = "BulletDecal";
             public const string BULLET_TRAIL = "BulletTrail";
             public const string IMPACT_EFFECT = "ImpactEffect";
+            public const string MUZZLE_FLASH = "MuzzleFlash";
         }
         
         public static class Layers
         {
             public const string PLAYER = "Player";
+            public const string ENEMY = "Enemy";
+            public const string ENVIRONMENT = "Default";
+            public const string GROUND = "Ground";
+            public const string WALL = "Wall";
+            
+            // Cached layer masks for performance
+            public static readonly int LIVING_ENTITIES_MASK = 
+                (1 << UnityEngine.LayerMask.NameToLayer(PLAYER)) | 
+                (1 << UnityEngine.LayerMask.NameToLayer(ENEMY));
+            
+            public static readonly int DECAL_SURFACES_MASK = 
+                (1 << UnityEngine.LayerMask.NameToLayer(ENVIRONMENT)) |
+                (1 << UnityEngine.LayerMask.NameToLayer(GROUND)) |
+                (1 << UnityEngine.LayerMask.NameToLayer(WALL));
+            
+            public static readonly int ALL_HITTABLE_MASK = 
+                LIVING_ENTITIES_MASK | DECAL_SURFACES_MASK;
         }
         
         public static class Movement
@@ -78,6 +97,30 @@ namespace Constants
             public const float LOOK_INPUT_THRESHOLD = 0.0001f;
             public const float LANDING_TIME_THRESHOLD = 0.3f;
             public const float MOVEMENT_INPUT_THRESHOLD = 0.1f;
+        }
+        
+        public static class AI
+        {
+            public const float DEFAULT_DETECTION_RANGE = 15f;
+            public const float DEFAULT_ATTACK_RANGE = 8f;
+            public const float DEFAULT_ATTACK_DAMAGE = 25f;
+            public const float DEFAULT_ATTACK_COOLDOWN = 1.5f;
+            public const float DEFAULT_PATROL_WAIT_TIME = 2f;
+            public const float DEFAULT_AGENT_SPEED = 3f;
+            public const float DEFAULT_AGENT_ANGULAR_SPEED = 120f;
+            public const float DEFAULT_AGENT_ACCELERATION = 8f;
+            public const float DEFAULT_STOPPING_DISTANCE = 0.5f;
+            public const float PATH_COMPLETE_THRESHOLD = 0.5f;
+            public const float LOST_PLAYER_MULTIPLIER = 1.5f;
+        }
+        
+        public static class Health
+        {
+            public const float DEFAULT_PLAYER_HEALTH = 100f;
+            public const float DEFAULT_ENEMY_HEALTH = 100f;
+            public const float DEFAULT_REGEN_RATE = 5f;
+            public const float DEFAULT_REGEN_DELAY = 3f;
+            public const float LOW_HEALTH_THRESHOLD = 0.25f;
         }
     }
 }

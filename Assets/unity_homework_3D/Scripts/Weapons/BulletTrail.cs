@@ -6,13 +6,14 @@ namespace Weapons
     [RequireComponent(typeof(LineRenderer))]
     public class BulletTrail : MonoBehaviour, Managers.IPooledObject
     {
-        [Header("Trail Settings")] public float trailSpeed = GameConstants.Trails.DEFAULT_SPEED;
-        public float lifetime = GameConstants.Trails.DEFAULT_LIFETIME;
+        [SerializeField] private float trailSpeed = GameConstants.Trails.DEFAULT_SPEED;
+        [SerializeField] private float lifetime = GameConstants.Trails.DEFAULT_LIFETIME;
 
         private LineRenderer _lineRenderer;
         private Vector3 _startPoint;
         private Vector3 _endPoint;
         private float _progress;
+        private float _distance;
         private bool _isActive;
 
         private void Awake()
@@ -34,11 +35,12 @@ namespace Weapons
         {
             _startPoint = startPoint;
             _endPoint = endPoint;
+            _distance = Vector3.Distance(startPoint, endPoint);
             _progress = 0f;
             _isActive = true;
 
-            _lineRenderer.SetPosition(0, _startPoint);
-            _lineRenderer.SetPosition(1, _startPoint);
+            _lineRenderer.SetPosition(0, startPoint);
+            _lineRenderer.SetPosition(1, startPoint);
 
             CancelInvoke();
             Invoke(nameof(ReturnToPool), lifetime);
@@ -48,11 +50,15 @@ namespace Weapons
         {
             if (!_isActive) return;
 
-            _progress += trailSpeed * Time.deltaTime / Vector3.Distance(_startPoint, _endPoint);
-            _progress = Mathf.Clamp01(_progress);
+            _progress += trailSpeed * Time.deltaTime / _distance;
+            
+            if (_progress >= 1f)
+            {
+                _progress = 1f;
+                _isActive = false;
+            }
 
-            Vector3 currentEnd = Vector3.Lerp(_startPoint, _endPoint, _progress);
-            _lineRenderer.SetPosition(1, currentEnd);
+            _lineRenderer.SetPosition(1, Vector3.Lerp(_startPoint, _endPoint, _progress));
         }
 
         private void ReturnToPool()
