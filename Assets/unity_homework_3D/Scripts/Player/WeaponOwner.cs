@@ -1,6 +1,7 @@
 using Constants;
 using UnityEngine;
 using Collectibles;
+using Managers;
 using Weapons;
 
 namespace Player
@@ -179,6 +180,8 @@ namespace Player
             weapon.Attach(weaponHolder);
             _currentCollectible = weapon;
             _currentWeapon = weapon.WeaponComponent;
+            
+            AudioManager.Instance?.PlayWeaponSwitch();
             
             if (_currentWeapon)
                 _currentWeapon.SetWeaponUser(this);

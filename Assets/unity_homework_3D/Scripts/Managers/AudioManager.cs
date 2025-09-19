@@ -1,131 +1,195 @@
 using UnityEngine;
+using UnityEngine.Audio;
 
 namespace Managers
 {
     /// <summary>
-    /// Centralized audio management system
+    /// Audio management system for game sounds
     /// </summary>
     public class AudioManager : MonoBehaviour
     {
         public static AudioManager Instance { get; private set; }
         
-        [Header("Audio Sources")]
-        [SerializeField] private AudioSource weaponAudioSource;
-        [SerializeField] private AudioSource uiAudioSource;
-        [SerializeField] private AudioSource ambientAudioSource;
+        [Header("Audio Mixer")]
+        [SerializeField] private AudioMixer audioMixer;
+        
+        [Header("Background Music")]
+        [SerializeField] private AudioClip backgroundMusic;
         
         [Header("Weapon Sounds")]
-        [SerializeField] private AudioClip[] fireSounds;
-        [SerializeField] private AudioClip[] reloadSounds;
-        [SerializeField] private AudioClip[] impactSounds;
+        [SerializeField] private AudioClip singleFireSound;
+        [SerializeField] private AudioClip autoFireSound;
+        [SerializeField] private AudioClip weaponSwitchSound;
+        
+        [Header("Effect Sounds")]
+        [SerializeField] private AudioClip impactSound;
+        
+        private AudioSource _musicAudioSource;
+        private AudioSource _sfxAudioSource;
+        
+        // Audio state
+        private bool _masterEnabled = true;
+        private float _musicVolume = 0.75f;
+        private float _sfxVolume = 0.75f;
         
         private void Awake()
         {
             if (Instance == null)
             {
                 Instance = this;
-                
-                // Find root object and make persistent
-                Transform rootTransform = transform;
-                while (rootTransform.parent != null)
-                {
-                    rootTransform = rootTransform.parent;
-                }
-                
-                DontDestroyOnLoad(rootTransform.gameObject);
-                
-                InitializeAudioSources();
+                DontDestroyOnLoad(gameObject);
+                InitializeAudio();
             }
             else
             {
-                // Destroy duplicate
-                Transform rootToDestroy = transform;
-                while (rootToDestroy.parent != null)
-                {
-                    rootToDestroy = rootToDestroy.parent;
-                }
-                Destroy(rootToDestroy.gameObject);
+                Destroy(gameObject);
             }
         }
         
-        private void InitializeAudioSources()
+        private void InitializeAudio()
         {
-            if (!weaponAudioSource)
+            SetupAudioSources();
+            AssignMixerGroups();
+            StartBackgroundMusic();
+            SubscribeToGameEvents();
+        }
+        
+        private void SetupAudioSources()
+        {
+            if (!_musicAudioSource)
             {
-                weaponAudioSource = gameObject.AddComponent<AudioSource>();
-                weaponAudioSource.playOnAwake = false;
+                _musicAudioSource = gameObject.AddComponent<AudioSource>();
+                _musicAudioSource.playOnAwake = false;
+                _musicAudioSource.loop = true;
+                _musicAudioSource.spatialBlend = 0f;
             }
             
-            if (!uiAudioSource)
+            if (!_sfxAudioSource)
             {
-                uiAudioSource = gameObject.AddComponent<AudioSource>();
-                uiAudioSource.playOnAwake = false;
+                _sfxAudioSource = gameObject.AddComponent<AudioSource>();
+                _sfxAudioSource.playOnAwake = false;
+                _sfxAudioSource.spatialBlend = 0f;
             }
+        }
+        
+        private void AssignMixerGroups()
+        {
+            if (!audioMixer) return;
             
-            if (!ambientAudioSource)
-            {
-                ambientAudioSource = gameObject.AddComponent<AudioSource>();
-                ambientAudioSource.playOnAwake = false;
-                ambientAudioSource.loop = true;
-            }
-        }
-        
-        // Weapon audio methods
-        public void PlayWeaponFire(int weaponType = 0)
-        {
-            if (fireSounds != null && fireSounds.Length > weaponType && fireSounds[weaponType])
-            {
-                weaponAudioSource.PlayOneShot(fireSounds[weaponType]);
-            }
-        }
-        
-        public void PlayWeaponReload(int weaponType = 0)
-        {
-            if (reloadSounds != null && reloadSounds.Length > weaponType && reloadSounds[weaponType])
-            {
-                weaponAudioSource.PlayOneShot(reloadSounds[weaponType]);
-            }
-        }
-        
-        public void PlayImpact(int impactType = 0)
-        {
-            if (impactSounds != null && impactSounds.Length > impactType && impactSounds[impactType])
-            {
-                weaponAudioSource.PlayOneShot(impactSounds[impactType]);
-            }
-        }
-        
-        // Generic audio methods
-        public void PlayOneShot(AudioClip clip, AudioSource source = null)
-        {
-            if (!clip) return;
+            var musicGroups = audioMixer.FindMatchingGroups("Music");
+            var sfxGroups = audioMixer.FindMatchingGroups("SFX");
             
-            if (source == null) source = weaponAudioSource;
-            source.PlayOneShot(clip);
+            if (musicGroups.Length > 0)
+                _musicAudioSource.outputAudioMixerGroup = musicGroups[0];
+            
+            if (sfxGroups.Length > 0)
+                _sfxAudioSource.outputAudioMixerGroup = sfxGroups[0];
         }
         
-        public void PlayAtPosition(AudioClip clip, Vector3 position, float volume = 1f)
+        private void StartBackgroundMusic()
         {
-            if (clip)
+            if (backgroundMusic && _musicAudioSource)
             {
-                AudioSource.PlayClipAtPoint(clip, position, volume);
+                _musicAudioSource.clip = backgroundMusic;
+                _musicAudioSource.Play();
             }
         }
         
-        // Volume controls
-        public void SetWeaponVolume(float volume)
+        // Settings methods
+        public void SetMasterEnabled(bool enabled)
         {
-            if (weaponAudioSource) weaponAudioSource.volume = Mathf.Clamp01(volume);
+            _masterEnabled = enabled;
+            ApplyAudioSettings();
         }
         
-        public void SetUIVolume(float volume)
+        public void SetMusicVolume(float volume)
         {
-            if (uiAudioSource) uiAudioSource.volume = Mathf.Clamp01(volume);
+            _musicVolume = Mathf.Clamp01(volume);
+            ApplyAudioSettings();
         }
         
-        public void SetAmbientVolume(float volume)
+        public void SetSFXVolume(float volume)
         {
-            if (ambientAudioSource) ambientAudioSource.volume = Mathf.Clamp01(volume);
+            _sfxVolume = Mathf.Clamp01(volume);
+            ApplyAudioSettings();
         }
+        
+        private void ApplyAudioSettings()
+        {
+            if (!audioMixer) return;
+            
+            if (_masterEnabled)
+            {
+                float musicDB = _musicVolume > 0 ? Mathf.Log10(_musicVolume) * 20 : -80f;
+                float sfxDB = _sfxVolume > 0 ? Mathf.Log10(_sfxVolume) * 20 : -80f;
+                
+                audioMixer.SetFloat("MusicVolume", musicDB);
+                audioMixer.SetFloat("SFXVolume", sfxDB);
+            }
+            else
+            {
+                audioMixer.SetFloat("MusicVolume", -80f);
+                audioMixer.SetFloat("SFXVolume", -80f);
+            }
+        }
+        
+        public void PlayWeaponFire(bool isFullAuto = false)
+        {
+            AudioClip clipToPlay = isFullAuto ? autoFireSound : singleFireSound;
+            if (clipToPlay && _sfxAudioSource)
+                _sfxAudioSource.PlayOneShot(clipToPlay);
+        }
+        
+        public void PlayWeaponSwitch()
+        {
+            if (weaponSwitchSound && _sfxAudioSource)
+                _sfxAudioSource.PlayOneShot(weaponSwitchSound);
+        }
+        
+        public void PlayImpact()
+        {
+            if (impactSound && _sfxAudioSource)
+                _sfxAudioSource.PlayOneShot(impactSound);
+        }
+        
+        // 3D positional audio for enemies
+        public void PlayWeaponFireAt(Vector3 position, bool isFullAuto = false)
+        {
+            AudioClip clipToPlay = isFullAuto ? autoFireSound : singleFireSound;
+            if (clipToPlay)
+                AudioSource.PlayClipAtPoint(clipToPlay, position);
+        }
+        
+        public void PlayImpactAt(Vector3 position)
+        {
+            if (impactSound)
+                AudioSource.PlayClipAtPoint(impactSound, position);
+        }
+        
+        private void SubscribeToGameEvents()
+        {
+            if (GameManager.Instance)
+            {
+                GameManager.Instance.OnGameRestarted += OnGameRestarted;
+            }
+        }
+
+        private void OnGameRestarted()
+        {
+            StartBackgroundMusic();
+        }
+
+        private void OnDestroy()
+        {
+            if (GameManager.Instance)
+            {
+                GameManager.Instance.OnGameRestarted -= OnGameRestarted;
+            }
+        }
+        
+        // Getters
+        public bool IsMasterEnabled() => _masterEnabled;
+        public float GetMusicVolume() => _musicVolume;
+        public float GetSFXVolume() => _sfxVolume;
     }
 }

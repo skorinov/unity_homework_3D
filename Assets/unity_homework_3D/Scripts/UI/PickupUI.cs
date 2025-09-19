@@ -33,7 +33,7 @@ namespace UI
         
         private void UpdatePickupPrompt()
         {
-            bool shouldShow = weaponOwner.HighlightedWeapon != null;
+            bool shouldShow = weaponOwner.HighlightedWeapon;
             
             if (shouldShow != _isShowing)
             {

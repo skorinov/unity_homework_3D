@@ -29,6 +29,13 @@ namespace Weapons
         {
             _progress = 0f;
             _isActive = true;
+            
+            // Reset line renderer positions
+            if (_lineRenderer)
+            {
+                _lineRenderer.SetPosition(0, Vector3.zero);
+                _lineRenderer.SetPosition(1, Vector3.zero);
+            }
         }
 
         public void Initialize(Vector3 startPoint, Vector3 endPoint)

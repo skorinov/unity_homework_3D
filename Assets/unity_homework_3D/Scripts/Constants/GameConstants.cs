@@ -101,17 +101,12 @@ namespace Constants
         
         public static class AI
         {
-            public const float DEFAULT_DETECTION_RANGE = 15f;
             public const float DEFAULT_ATTACK_RANGE = 8f;
-            public const float DEFAULT_ATTACK_DAMAGE = 25f;
-            public const float DEFAULT_ATTACK_COOLDOWN = 1.5f;
             public const float DEFAULT_PATROL_WAIT_TIME = 2f;
             public const float DEFAULT_AGENT_SPEED = 3f;
             public const float DEFAULT_AGENT_ANGULAR_SPEED = 120f;
             public const float DEFAULT_AGENT_ACCELERATION = 8f;
             public const float DEFAULT_STOPPING_DISTANCE = 0.5f;
-            public const float PATH_COMPLETE_THRESHOLD = 0.5f;
-            public const float LOST_PLAYER_MULTIPLIER = 1.5f;
         }
         
         public static class Health
@@ -121,6 +116,13 @@ namespace Constants
             public const float DEFAULT_REGEN_RATE = 5f;
             public const float DEFAULT_REGEN_DELAY = 3f;
             public const float LOW_HEALTH_THRESHOLD = 0.25f;
+        }
+        
+        public static class PlayerPrefs
+        {
+            public const string MASTER_SOUND_KEY = "MasterSoundEnabled";
+            public const string MUSIC_VOLUME_KEY = "MusicVolume";
+            public const string SFX_VOLUME_KEY = "SFXVolume";
         }
     }
 }

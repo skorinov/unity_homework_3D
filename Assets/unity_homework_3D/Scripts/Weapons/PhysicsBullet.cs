@@ -215,6 +215,8 @@ namespace Weapons
             Vector3 effectPosition = position + normal * GameConstants.Bullets.IMPACT_EFFECT_OFFSET;
             Quaternion effectRotation = Quaternion.LookRotation(normal);
             
+            AudioManager.Instance?.PlayImpact();
+            
             ObjectPool.Instance?.SpawnFromPoolTimed(
                 GameConstants.Pools.IMPACT_EFFECT, 
                 effectPosition, 

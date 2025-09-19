@@ -1,3 +1,4 @@
+using Managers;
 using UnityEngine;
 using Weapons;
 
@@ -32,7 +33,7 @@ namespace AI
         // ITargetProvider implementation
         public Transform GetTarget() => _target;
         public Vector3 GetAimPoint() => _target ? _target.position + Vector3.up * aimHeight : Vector3.zero;
-        public bool HasValidTarget() => _target != null;
+        public bool HasValidTarget() => _target;
         
         // Public properties
         public bool CanShoot => _weapon?.CanFire == true && HasValidTarget() && HasLineOfSight();
@@ -111,6 +112,8 @@ namespace AI
                 if (CanShoot)
                 {
                     _weapon.Fire();
+                    AudioManager.Instance?.PlayWeaponFireAt(transform.position, _weapon.weaponData.isFullAuto);
+                    
                     _currentBurstShot++;
                     
                     if (_currentBurstShot < burstCount)

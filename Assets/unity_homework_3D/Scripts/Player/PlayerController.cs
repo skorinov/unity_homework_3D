@@ -33,6 +33,9 @@ namespace Player
         [Header("Weapon System")] 
         public WeaponOwner weaponOwner;
 
+        [Header("Damage Collider")] 
+        public CapsuleCollider damageCollider;
+
         private CharacterController _controller;
         private Vector3 _velocity;
         private bool _isGrounded;
@@ -58,7 +61,34 @@ namespace Player
             if (!weaponOwner)
                 weaponOwner = GetComponent<WeaponOwner>();
 
+            SetupDamageCollider();
             SetCursorState(true);
+        }
+
+        private void SetupDamageCollider()
+        {
+            if (!damageCollider)
+            {
+                // Create damage collider if not assigned
+                GameObject damageColliderObj = new GameObject("DamageCollider");
+                damageColliderObj.transform.SetParent(transform);
+                damageColliderObj.transform.localPosition = Vector3.zero;
+                damageColliderObj.layer = gameObject.layer; // Same layer as player
+
+                damageCollider = damageColliderObj.AddComponent<CapsuleCollider>();
+                damageCollider.isTrigger = true;
+                
+                // Match CharacterController dimensions
+                damageCollider.height = _controller.height;
+                damageCollider.radius = _controller.radius * 0.9f; // Slightly smaller to avoid edge cases
+                damageCollider.center = _controller.center;
+            }
+            else
+            {
+                // Ensure existing collider is properly configured
+                damageCollider.isTrigger = true;
+                damageCollider.gameObject.layer = gameObject.layer;
+            }
         }
 
         private void OnEnable()

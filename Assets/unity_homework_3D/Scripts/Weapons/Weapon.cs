@@ -285,7 +285,7 @@ namespace Weapons
         
         private void PlayEffects()
         {
-            AudioManager.Instance?.PlayWeaponFire();
+            AudioManager.Instance?.PlayWeaponFire(weaponData.isFullAuto);
             PlayMuzzleFlash();
         }
         
@@ -311,8 +311,6 @@ namespace Weapons
         private System.Collections.IEnumerator ReloadCoroutine()
         {
             _isReloading = true;
-            
-            AudioManager.Instance?.PlayWeaponReload();
             
             yield return new WaitForSeconds(weaponData.reloadTime);
             

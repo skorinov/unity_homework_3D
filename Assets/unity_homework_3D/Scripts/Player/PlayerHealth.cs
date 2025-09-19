@@ -111,7 +111,6 @@ namespace Player
                 _playerController.enabled = false;
             
             OnPlayerDied?.Invoke();
-            Debug.Log("Player died!");
         }
         
         private void ShowDamageEffect()
